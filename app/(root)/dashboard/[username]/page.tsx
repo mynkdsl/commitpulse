@@ -83,6 +83,7 @@ export default async function DashboardPage({
         <RefreshButton username={username} />
         <Link
           href="/"
+          aria-label="Generate your own dashboard"
           className="flex items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.15)] bg-black px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/5 active:scale-[0.98]"
         >
           <svg
