@@ -781,6 +781,37 @@ describe('GitHub API cache behavior', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('dedupes concurrent contribution requests for the same cold cache key', async () => {
+    let resolveFetch!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+
+    const requests = Promise.all([
+      fetchGitHubContributions('octocat'),
+      fetchGitHubContributions('octocat'),
+      fetchGitHubContributions('octocat'),
+    ]);
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    resolveFetch(
+      mockResponse({
+        data: {
+          user: {
+            contributionsCollection: { contributionCalendar: mockCalendar },
+          },
+        },
+      })
+    );
+
+    const results = await requests;
+    expect(results.map((result) => result.totalContributions)).toEqual([42, 42, 42]);
+  });
+
   it('refresh bypass: bypassCache=true forces a fresh fetch', async () => {
     vi.mocked(fetch).mockImplementation(async () =>
       mockResponse({
@@ -829,6 +860,29 @@ describe('GitHub API cache behavior', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('dedupes concurrent profile requests for the same cold cache key', async () => {
+    let resolveFetch!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+
+    const requests = Promise.all([
+      fetchUserProfile('octocat'),
+      fetchUserProfile('octocat'),
+      fetchUserProfile('octocat'),
+    ]);
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    resolveFetch(mockResponse({ login: 'octocat', name: 'The Octocat' }));
+
+    const results = await requests;
+    expect(results.map((profile) => profile.login)).toEqual(['octocat', 'octocat', 'octocat']);
+  });
+
   it('refresh bypass: bypassCache=true forces fresh profile fetch', async () => {
     vi.mocked(fetch).mockImplementation(async () =>
       mockResponse({ login: 'octocat', name: 'The Octocat' })
@@ -838,6 +892,29 @@ describe('GitHub API cache behavior', () => {
     await fetchUserProfile('octocat', { bypassCache: true });
 
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('dedupes concurrent repo requests for the same cold cache key', async () => {
+    let resolveFetch!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+
+    const requests = Promise.all([
+      fetchUserRepos('octocat'),
+      fetchUserRepos('octocat'),
+      fetchUserRepos('octocat'),
+    ]);
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    resolveFetch(mockResponse([{ stargazers_count: 7, language: 'TypeScript' }]));
+
+    const results = await requests;
+    expect(results.map((repos) => repos[0]?.stargazers_count)).toEqual([7, 7, 7]);
   });
 
   it('normalizes username casing for cache keys', async () => {
